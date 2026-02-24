@@ -9,13 +9,14 @@ plugins {
 }
 
 android {
-    namespace = "com.example.it_passport_app"
+    namespace = "jp.truejinai.it_passport_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -24,13 +25,14 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.it_passport_app"
+        applicationId = "jp.truejinai.it_passport_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true
     }
 
     val keystoreProperties = Properties()
@@ -57,6 +59,9 @@ android {
             } else {
                 signingConfig = signingConfigs.getByName("debug")
             }
+            ndk {
+                debugSymbolLevel = "none"
+            }
             // Workaround for NDK strip failure on Windows
             packagingOptions {
                 jniLibs {
@@ -69,4 +74,8 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }

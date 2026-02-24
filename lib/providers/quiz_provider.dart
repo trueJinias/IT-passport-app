@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/question.dart';
 import '../services/review_service.dart';
 import '../services/settings_service.dart';
+import '../services/notification_service.dart';
 
 enum QuizMode { normal, review }
 
@@ -15,6 +17,8 @@ class QuizState {
   final int? selectedOptionIndex;
   final bool isAnswered;
   final QuizMode mode;
+  final String? errorMessage;
+  final Map<int, String>? nextIntervalLabels; // For buttons 1,2,3,4
 
   QuizState({
     this.questions = const [],
@@ -24,6 +28,8 @@ class QuizState {
     this.selectedOptionIndex,
     this.isAnswered = false,
     this.mode = QuizMode.normal,
+    this.errorMessage,
+    this.nextIntervalLabels,
   });
 
   QuizState copyWith({
@@ -34,6 +40,8 @@ class QuizState {
     int? selectedOptionIndex,
     bool? isAnswered,
     QuizMode? mode,
+    String? errorMessage,
+    Map<int, String>? nextIntervalLabels,
   }) {
     return QuizState(
       questions: questions ?? this.questions,
@@ -43,6 +51,8 @@ class QuizState {
       selectedOptionIndex: selectedOptionIndex,
       isAnswered: isAnswered ?? this.isAnswered,
       mode: mode ?? this.mode,
+      errorMessage: errorMessage,
+      nextIntervalLabels: nextIntervalLabels ?? this.nextIntervalLabels,
     );
   }
 
@@ -50,90 +60,138 @@ class QuizState {
   Question get currentQuestion => questions[currentIndex];
 }
 
+// Top-level function for compute
+List<Question> _parseJson(String jsonString) {
+  final List<dynamic> jsonList = json.decode(jsonString);
+  return jsonList.map((j) => Question.fromJson(j)).toList();
+}
+
 class QuizNotifier extends StateNotifier<QuizState> {
   final ReviewService _reviewService = ReviewService();
   List<Question> _allQuestions = [];
 
-  QuizNotifier() : super(QuizState()) {
-    loadQuestions();
+  QuizNotifier() : super(QuizState()); 
+
+  // Internal data loader - Uses compute to avoid blocking UI
+  Future<void> _loadData() async {
+    final String jsonString = await rootBundle.loadString('assets/questions.json');
+    // Run JSON parsing in a separate isolate
+    _allQuestions = await compute(_parseJson, jsonString);
   }
 
-  Future<void> loadQuestions() async {
-    try {
-      state = state.copyWith(isLoading: true);
-      // Removed artificial delay for performance with large dataset
-      final String jsonString = await rootBundle.loadString('assets/questions.json');
-      final List<dynamic> jsonList = json.decode(jsonString);
-      _allQuestions = jsonList.map((j) => Question.fromJson(j)).toList();
-
-      // Default to normal mode (all questions)
-      // For MVP, maybe limit to first 10 if not in review mode to keep it snappy?
-      // Or shuffle. Let's just take first 10 for normal mode.
-      startNormalQuiz(); 
-    } catch (e) {
-      print('Error loading questions: $e');
-      state = state.copyWith(isLoading: false);
+  Future<void> _ensureLoaded() async {
+    if (_allQuestions.isEmpty) {
+      await _loadData();
     }
   }
 
   Future<void> startNormalQuiz() async {
-    // Logic:
-    // 1. Get daily limit from Settings.
-    // 2. Check how many new cards already done today.
-    // 3. Calculate remaining allowance.
-    // 4. Filter _allQuestions to find "New" cards (not in learned list).
-    // 5. Take min(remaining, 10) for this session.
-    
-    state = state.copyWith(isLoading: true);
-    
-    final settingsService = SettingsService();
-    final limit = await settingsService.getNewCardsPerDay();
-    final alreadyDone = await _reviewService.getNewCardsCountToday();
-    final remaining = limit - alreadyDone;
-    
-    if (remaining <= 0) {
-      // No new cards allowed today
-      // For MVP, maybe show a dialog or just show 0 questions?
-      // Or maybe allow review of already learned cards in normal mode? 
-      // Let's just show an empty state or fallback to review mode?
-      // For now, let's just show 0 and let UI handle "No more new cards today".
-      state = QuizState(
-        questions: [],
-        isLoading: false,
-        mode: QuizMode.normal,
-      );
-      return;
+    try {
+      state = state.copyWith(isLoading: true, errorMessage: null);
+      await _ensureLoaded();
+      if (!mounted) return;
+      
+      if (_allQuestions.isEmpty) {
+         if (mounted) state = state.copyWith(isLoading: false, errorMessage: '問題データが空です。(JSON Load Error?)');
+         return;
+      }
+      
+      final settingsService = SettingsService();
+      final limit = await settingsService.getNewCardsPerDay();
+      final alreadyDone = await _reviewService.getNewCardsCountToday();
+      final remaining = limit - alreadyDone;
+      
+      if (remaining <= 0) {
+        // Quota met, cancel today's notification
+        await NotificationService().completeForToday();
+        
+        if (mounted) {
+          state = QuizState(
+            questions: [],
+            isLoading: false,
+            mode: QuizMode.normal,
+            errorMessage: '本日の学習ノルマ(${limit}問)を達成済みです。\n(${alreadyDone}問 完了済み)',
+          );
+        }
+        return;
+      }
+      
+      final learnedIds = await _reviewService.getLearnedQuestionIds();
+      final newQuestions = _allQuestions.where((q) => !learnedIds.contains(q.id)).toList();
+      
+      if (newQuestions.isEmpty) {
+         if (mounted) {
+           state = QuizState(
+            questions: [],
+            isLoading: false,
+            mode: QuizMode.normal,
+            errorMessage: 'すべての問題を学習済みです！\n(全${_allQuestions.length}問)',
+          );
+         }
+        return;
+      }
+      
+      final countToTake = remaining < 10 ? remaining : 10;
+      final shuffled = listShim(newQuestions)..shuffle();
+      final quizQuestions = shuffled.take(countToTake).toList();
+      
+      if (quizQuestions.isEmpty) {
+         if (mounted) state = state.copyWith(isLoading: false, errorMessage: '予期せぬエラー: 出題データ作成失敗');
+         return;
+      }
+      
+      if (mounted) {
+        state = QuizState(
+          questions: quizQuestions,
+          isLoading: false,
+          mode: QuizMode.normal,
+          errorMessage: null,
+        );
+      }
+    } catch (e) {
+       print('Quiz Error: $e');
+       if (mounted) state = state.copyWith(isLoading: false, errorMessage: 'エラーが発生しました: $e');
     }
-    
-    final learnedIds = await _reviewService.getLearnedQuestionIds();
-    final newQuestions = _allQuestions.where((q) => !learnedIds.contains(q.id)).toList();
-    
-    // Shuffle and take
-    final countToTake = remaining < 10 ? remaining : 10;
-    final shuffled = listShim(newQuestions)..shuffle();
-    final quizQuestions = shuffled.take(countToTake).toList();
-    
-    state = QuizState(
-      questions: quizQuestions,
-      isLoading: false,
-      mode: QuizMode.normal,
-    );
   }
 
   Future<void> startReviewQuiz() async {
-    state = state.copyWith(isLoading: true);
-    final dueIds = await _reviewService.getDueQuestionIds();
-    
-    final reviewQuestions = _allQuestions.where((q) => dueIds.contains(q.id)).toList();
-    
-    // If no questions due, maybe show a message?
-    // For now, if empty, we just handle it in UI or show empty list.
-    
-    state = QuizState(
-      questions: reviewQuestions,
-      isLoading: false,
-      mode: QuizMode.review,
-    );
+    try {
+      state = state.copyWith(isLoading: true, errorMessage: null);
+      await _ensureLoaded();
+      if (!mounted) return;
+      
+      if (_allQuestions.isEmpty) {
+         if (mounted) state = state.copyWith(isLoading: false, errorMessage: '問題データがロードされていません。');
+         return;
+      }
+
+      final dueIds = await _reviewService.getDueQuestionIds();
+      
+      if (dueIds.isEmpty) {
+         if (mounted) {
+           state = QuizState(
+            questions: [],
+            isLoading: false,
+            mode: QuizMode.review,
+            errorMessage: '現在、復習すべき問題はありません。',
+          );
+         }
+        return;
+      }
+
+      final reviewQuestions = _allQuestions.where((q) => dueIds.contains(q.id)).toList();
+      
+      if (mounted) {
+        state = QuizState(
+          questions: reviewQuestions,
+          isLoading: false,
+          mode: QuizMode.review,
+          errorMessage: null,
+        );
+      }
+    } catch (e) {
+      if (mounted) state = state.copyWith(isLoading: false, errorMessage: '復習モードエラー: $e');
+    }
   }
 
   Future<void> selectOption(int index) async {
@@ -142,14 +200,79 @@ class QuizNotifier extends StateNotifier<QuizState> {
     final question = state.currentQuestion;
     final isCorrect = index == question.correctIndex;
 
-    // Save review status
-    await _reviewService.saveReviewStatus(question.id, isCorrect);
+    // Use actual calculations to show real intervals on buttons
+    final calcGood = await _reviewService.calculateNextReview(question.id, 3);
+    final calcEasy = await _reviewService.calculateNextReview(question.id, 4);
+    int intervalGood = calcGood['interval'] as int;
+    int intervalEasy = calcEasy['interval'] as int;
+    int delayGood = calcGood['delayMinutes'] as int;
+    int delayEasy = calcEasy['delayMinutes'] as int;
 
-    state = state.copyWith(
-      selectedOptionIndex: index,
-      isAnswered: true,
-      score: isCorrect ? state.score + 1 : state.score,
-    );
+    // If card is in learning/relearning phase (graduation):
+    // Show the BASE graduation interval: Good="明日"(1日), Easy="3日後"(3日)
+    // After "Again" resets step to 0, this ensures correct graduation intervals.
+    if (delayGood <= 1440) {
+      intervalGood = 1;  // base interval for Good
+      delayGood = 1 * 1440;
+      intervalEasy = 3;  // base interval for Easy
+      delayEasy = 3 * 1440;
+    }
+
+    String formatInterval(int days, int minutes) {
+      if (minutes < 1440) return '今日';
+      if (days == 1) return '明日';
+      if (days > 30) return '${(days/30).floor()}ヶ月後';
+      return '$days日後';
+    }
+
+    final labels = <int, String>{
+      1: '今回',   // Again
+      2: '今日',   // Hard
+      3: formatInterval(intervalGood, delayGood),   // Good
+      4: formatInterval(intervalEasy, delayEasy),   // Easy
+    };
+
+    if (mounted) {
+      state = state.copyWith(
+        selectedOptionIndex: index,
+        isAnswered: true,
+        score: isCorrect ? state.score + 1 : state.score,
+        nextIntervalLabels: labels,
+      );
+    }
+  }
+
+  Future<void> rateQuestion(int rating) async {
+    final question = state.currentQuestion;
+    await _reviewService.saveReview(question.id, rating);
+    
+    var currentQuestions = List<Question>.from(state.questions);
+    
+    // If "Again" (1), re-queue the question +10 spots later (or at end)
+    if (rating == 1) {
+      final insertIndex = (state.currentIndex + 1 + 10).clamp(0, currentQuestions.length);
+      // If we are at the end, just appending works, but clamp handles it.
+      // We want to insert it so it appears LATER.
+      // If insertIndex == length, it appends.
+      if (insertIndex >= currentQuestions.length) {
+         currentQuestions.add(question);
+      } else {
+         currentQuestions.insert(insertIndex, question);
+      }
+      
+      // Update state with new list immediately so nextQuestion sees it? 
+      // Actually nextQuestion just increments index.
+      // We need to update the list in State.
+    }
+    
+    // Proceed to next
+    if (state.currentIndex < currentQuestions.length) {
+       // We must update the list in state first if we modified it
+       state = state.copyWith(questions: currentQuestions);
+       
+       // Then move index
+       nextQuestion();
+    }
   }
 
   void nextQuestion() {
@@ -162,20 +285,19 @@ class QuizNotifier extends StateNotifier<QuizState> {
         selectedOptionIndex: null,
         isAnswered: false,
         mode: state.mode,
+        errorMessage: null,
       );
     }
   }
 
   void resetQuiz() {
-    // Default to start normal quiz again
-    startNormalQuiz();
+    startNormalQuiz(); // Retry or restart
   }
   
-  // Helper to clone list for shuffling
   List<T> listShim<T>(List<T> list) => List<T>.from(list);
 }
 
-final quizProvider = StateNotifierProvider.autoDispose<QuizNotifier, QuizState>((ref) {
+final quizProvider = StateNotifierProvider<QuizNotifier, QuizState>((ref) {
   return QuizNotifier();
 });
 
@@ -183,4 +305,12 @@ final dueQuestionCountProvider = FutureProvider.autoDispose<int>((ref) async {
   final service = ReviewService();
   final dueIds = await service.getDueQuestionIds();
   return dueIds.length;
+});
+
+final statsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  return ReviewService().getStats();
+});
+
+final futureReviewsProvider = FutureProvider.autoDispose<List<int>>((ref) async {
+  return ReviewService().getFutureReviews(7);
 });

@@ -51,46 +51,119 @@ class ReviewService {
     return "${now.year}-${now.month}-${now.day}";
   }
 
-  Future<void> saveReviewStatus(int questionId, bool isCorrect) async {
+  // Calculate next review details without saving (for UI display)
+  // Rating: 1=Again, 2=Hard, 3=Good, 4=Easy
+  Future<Map<String, dynamic>> calculateNextReview(int questionId, int rating) async {
     final data = await _loadData();
     final String idStr = questionId.toString();
     
-    // Check if it's a new card (no interval yet or interval 0 not strictly new but close enough for MVP logic)
-    // Better: check if key exists.
+    Map<String, dynamic> itemData = data[idStr] ?? {
+      'interval': 0, // 0 means learning/relearning steps
+      'step': 0, // current learning step index (used as review count after graduation)
+      'baseInterval': 1,
+      'ease': 2.5,
+    };
+    
+    int interval = itemData['interval'] as int? ?? 0;
+    int step = itemData['step'] as int? ?? 0;
+    int? savedBase = itemData['baseInterval'] as int?;
+    
+    // Heuristic for legacy data
+    if (interval > 0 && step == 0) {
+      step = 1;
+    }
+    
+    int baseInterval = savedBase ?? 1;
+    if (savedBase == null && interval > 0) {
+       // Estimate base for legacy data
+       baseInterval = (interval == 3 || interval % 3 == 0 || interval % 8 == 0) ? 3 : 1;
+    }
+
+    double ease = itemData['ease'] as double? ?? 2.5;
+    int delayMinutes = 0;
+
+    if (rating == 1) { // Again
+      interval = 0; 
+      baseInterval = 1;
+      step = 0;
+      delayMinutes = 1; 
+      ease = (ease - 0.2).clamp(1.3, 5.0);
+    } else if (rating == 2) { // Hard
+       if (interval == 0) {
+         // Graduating from Learning via Hard
+         baseInterval = 1;
+         interval = 1;
+         step = 1;
+         delayMinutes = 1;
+       } else {
+         // Review phase: Hard means review again very soon (today)
+         // We keep the card at its current level but schedule it for now.
+         delayMinutes = 1; 
+       }
+       ease = (ease - 0.15).clamp(1.3, 5.0);
+    } else if (rating == 3 || rating == 4) { // Good or Easy
+       if (interval == 0) {
+         // 初回学習時: 正解=1日、簡単=3日
+         baseInterval = (rating == 3) ? 1 : 3;
+         interval = baseInterval;
+         step = 1;
+         delayMinutes = interval * 1440; // 1日 or 3日
+       } else {
+         // 復習時: n × base × 2.5
+         int effectiveBase = (rating == 4) ? 3 : 1;
+         interval = ((step + 1) * effectiveBase * 2.5).round();
+         if (interval < 1) interval = 1;
+
+         if (rating == 4) baseInterval = 3; else baseInterval = 1;
+
+         step += 1;
+         delayMinutes = interval * 1440;
+       }
+       if (rating == 4) ease += 0.15;
+    }
+    
+    if (ease > 5.0) ease = 5.0; 
+    
+    // Calculate new timestamp
+    int nextReview = DateTime.now().add(Duration(minutes: delayMinutes)).millisecondsSinceEpoch;
+    
+    return {
+       'nextReview': nextReview,
+       'interval': interval,
+       'step': step,
+       'ease': ease,
+       'delayMinutes': delayMinutes, // Track delay for UI mapping
+       'encodedData': {
+         'interval': interval,
+         'step': step,
+         'baseInterval': baseInterval,
+         'ease': ease,
+         'nextReview': nextReview,
+         'lastReview': DateTime.now().millisecondsSinceEpoch,
+       }
+    };
+  }
+
+  // Save the review data based on selected rating
+  Future<void> saveReview(int questionId, int rating) async {
+    final data = await _loadData();
+    final String idStr = questionId.toString();
     bool isNew = !data.containsKey(idStr);
     
-    Map<String, dynamic> itemData = data[idStr] ?? {
-      'interval': 0,
-      'nextReview': DateTime.now().millisecondsSinceEpoch,
-      'learnedDate': DateTime.now().millisecondsSinceEpoch,
-    };
-
     if (isNew) {
       await _incrementDailyNewCount();
     }
-
-    int interval = itemData['interval'] as int;
-    int nextReview;
-
-    if (isCorrect) {
-      if (interval == 0) {
-        interval = 1;
-      } else {
-        interval = (interval * 2.5).round(); // SM-2 like expansion
-      }
-      nextReview = DateTime.now().add(Duration(days: interval)).millisecondsSinceEpoch;
-    } else {
-      interval = 0; // Reset
-      nextReview = DateTime.now().millisecondsSinceEpoch;
-    }
-
-    itemData['interval'] = interval;
-    itemData['nextReview'] = nextReview;
-    itemData['lastReview'] = DateTime.now().millisecondsSinceEpoch;
-
-    data[idStr] = itemData;
-
+    
+    final calculation = await calculateNextReview(questionId, rating);
+    data[idStr] = calculation['encodedData'];
+    
     await _saveData(data);
+  }
+
+  // Legacy support cleanup or keep if needed, but we typically replace it
+  Future<void> saveReviewStatus(int questionId, bool isCorrect) async {
+     // Default mapping: Correct -> Good (3), Incorrect -> Again (1)
+     await saveReview(questionId, isCorrect ? 3 : 1);
   }
 
   Future<List<int>> getDueQuestionIds() async {
