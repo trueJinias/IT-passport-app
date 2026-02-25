@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(flutter build:*)",
-      "Bash(/c/Users/sanad/OneDrive/Desktop/flutter/bin/flutter build:*)"
+      "Bash(/c/Users/sanad/OneDrive/Desktop/flutter/bin/flutter build:*)",
+      "Bash(cmd.exe /c \"where flutter 2>&1\")",
+      "Bash(cmd.exe /c \"cd \"\"C:\\\\Users\\\\sanad\\\\OneDrive\\\\Desktop\\\\Project ITPASS\"\" && where flutter\")",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\sanad\\\\flutter\\\\bin\\\\flutter.bat 2>&1 & dir C:\\\\flutter\\\\bin\\\\flutter.bat 2>&1 & dir C:\\\\src\\\\flutter\\\\bin\\\\flutter.bat 2>&1\")",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\sanad\\\\ /b 2>&1\")",
+      "Bash(powershell.exe -Command \"Get-Command flutter -ErrorAction SilentlyContinue | Select-Object Source\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem -Path ''C:\\\\'' -Filter ''flutter.bat'' -Recurse -ErrorAction SilentlyContinue -Depth 5 | Select-Object FullName\")",
+      "Bash(powershell.exe -Command \"[Environment]::GetEnvironmentVariable\\(''PATH'', ''User''\\)\")",
+      "Bash(powershell.exe -Command \"[Environment]::GetEnvironmentVariable\\(''PATH'', ''Machine''\\)\")",
+      "Bash(powershell.exe -Command \"Test-Path ''C:\\\\Users\\\\sanad\\\\AppData\\\\Local\\\\Programs\\\\Antigravity\\\\bin\\\\flutter.bat''\")",
+      "Bash(powershell.exe -Command \"Get-ChildItem ''C:\\\\Users\\\\sanad\\\\AppData\\\\Local\\\\Programs\\\\Antigravity\\\\bin'' -ErrorAction SilentlyContinue | Select-Object Name\")",
+      "Bash(powershell.exe -Command:*)"
     ]
   }
 }

@@ -82,19 +82,14 @@ class PaymentService {
        return;
     }
     
-    final ProductDetails? product = _products.firstWhere(
-      (prod) => prod.id == _coffeeProductId,
-      orElse: () => null as ProductDetails, // Will throw if strictly typed, handled below
-    );
-    
-    // Check if product was found
-    if (!_products.any((p) => p.id == _coffeeProductId)) {
-       // In dev mode, might not be found properly if not set up
-       onPurchaseError?.call('商品情報が見つかりません。\nGoogle Play Consoleで "$_coffeeProductId" を作成してください。');
+    final ProductDetails? product = _products.where((p) => p.id == _coffeeProductId).firstOrNull;
+
+    if (product == null) {
+       onPurchaseError?.call('商品情報が見つかりません。\nGoogle Play Consoleで "$_coffeeProductId" が有効になっているか確認してください。');
        return;
     }
 
-    final purchaseParam = PurchaseParam(productDetails: _products.firstWhere((p) => p.id == _coffeeProductId));
+    final purchaseParam = PurchaseParam(productDetails: product);
     
     // Consumable (can buy multiple times)
     try {

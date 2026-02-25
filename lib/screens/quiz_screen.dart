@@ -61,10 +61,7 @@ class QuizScreen extends ConsumerWidget {
 
     final question = quizState.currentQuestion;
 
-    return SafeArea(
-      top: true,
-      bottom: false,
-      child: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: Text('問題 ${quizState.currentIndex + 1} / ${quizState.questions.length}'),
         ),
@@ -220,7 +217,6 @@ class QuizScreen extends ConsumerWidget {
             ),
           ],
         ),
-      ),
     );
   }
 
