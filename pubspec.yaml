@@ -1,7 +1,7 @@
 name: it_passport_app
 description: A new Flutter project for IT Passport Exam.
 publish_to: 'none'
-version: 1.0.0+31
+version: 1.0.0+35
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

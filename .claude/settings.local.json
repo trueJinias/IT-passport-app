@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter build:*)",
+      "Bash(/c/Users/sanad/OneDrive/Desktop/flutter/bin/flutter build:*)"
+    ]
+  }
+}

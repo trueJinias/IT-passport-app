@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Flutter Web (dev)",
+      "runtimeExecutable": "/c/Users/sanad/OneDrive/Desktop/flutter/bin/flutter",
+      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "8080", "--web-hostname", "localhost"],
+      "port": 8080
+    },
+    {
+      "name": "Privacy Site",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8081", "--directory", "privacy_site"],
+      "port": 8081
+    }
+  ]
+}

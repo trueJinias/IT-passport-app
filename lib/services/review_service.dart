@@ -90,15 +90,15 @@ class ReviewService {
       ease = (ease - 0.2).clamp(1.3, 5.0);
     } else if (rating == 2) { // Hard
        if (interval == 0) {
-         // Graduating from Learning via Hard
+         // 学習フェーズ中のHard: 卒業させず学習継続（10分後に再表示）
          baseInterval = 1;
-         interval = 1;
-         step = 1;
-         delayMinutes = 1;
+         interval = 0;
+         step = 0;
+         delayMinutes = 10;
        } else {
          // Review phase: Hard means review again very soon (today)
          // We keep the card at its current level but schedule it for now.
-         delayMinutes = 1; 
+         delayMinutes = 1;
        }
        ease = (ease - 0.15).clamp(1.3, 5.0);
     } else if (rating == 3 || rating == 4) { // Good or Easy

@@ -124,10 +124,10 @@ class QuizScreen extends ConsumerWidget {
                             ),
                           ),
                           child: Text(
-                            question.options[index],
+                            '${['ア', 'イ', 'ウ', 'エ'][index < 4 ? index : index % 4]}. ${question.options[index]}',
                             style: TextStyle(
-                              color: isAnswered 
-                                  ? (isCorrect ? Colors.green : (isSelected ? Colors.red : Theme.of(context).colorScheme.onSurface)) 
+                              color: isAnswered
+                                  ? (isCorrect ? Colors.green : (isSelected ? Colors.red : Theme.of(context).colorScheme.onSurface))
                                   : Theme.of(context).colorScheme.onSurface,
                               fontWeight: isAnswered && (isCorrect || isSelected) ? FontWeight.bold : FontWeight.normal,
                             ),
