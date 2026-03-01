@@ -59,15 +59,12 @@ android {
             } else {
                 signingConfig = signingConfigs.getByName("debug")
             }
-            ndk {
-                debugSymbolLevel = "none"
-            }
-            // Workaround for NDK strip failure on Windows
-            packagingOptions {
-                jniLibs {
-                    keepDebugSymbols += "**/*.so"
-                }
-            }
+        }
+    }
+
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/*.so"
         }
     }
 }

@@ -75,7 +75,7 @@ class QuizScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     MarkdownBody(
-                      data: question.question,
+                      data: _preprocessText(question.question),
                       styleSheet: MarkdownStyleSheet(
                         p: GoogleFonts.notoSansJp(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
@@ -217,6 +217,14 @@ class QuizScreen extends ConsumerWidget {
             ),
           ],
         ),
+    );
+  }
+
+  /// 中黒「・」が箇条書き区切りとして使われている場合に改行を挿入する
+  String _preprocessText(String text) {
+    return text.replaceAllMapped(
+      RegExp(r'([^\n])・'),
+      (match) => '${match.group(1)}\n\n・',
     );
   }
 

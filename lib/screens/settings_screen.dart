@@ -5,6 +5,7 @@ import '../services/review_service.dart';
 import '../providers/quiz_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/payment_service.dart';
+import 'privacy_policy_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -264,6 +265,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () {
               // Trigger purchase
               PaymentService().buyCoffee();
+            },
+          ),
+          const Divider(),
+          const Text(
+            '法的情報',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('プライバシーポリシー'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PrivacyPolicyScreen(),
+                ),
+              );
             },
           ),
         ],

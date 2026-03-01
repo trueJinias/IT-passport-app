@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -10,15 +11,22 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  /// 破損した通知キャッシュをSharedPreferencesから削除する
+  Future<void> _clearNotificationCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // flutter_local_notifications が使用するキャッシュキーをクリア
+      await prefs.remove('scheduled_notifications');
+      await prefs.remove('flutter_notification_plugin_cache');
+    } catch (_) {}
+  }
+
   Future<void> init() async {
     try {
       tz.initializeTimeZones();
-      // Use Tokyo time as default for IT Passport (mostly Japanese users)
-      // If local detection fails, this ensures a valid location.
       try {
         tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
       } catch (e) {
-        // Fallback to UTC if even Tokyo fails
         tz.setLocalLocation(tz.UTC);
       }
 
@@ -29,9 +37,16 @@ class NotificationService {
           InitializationSettings(android: initializationSettingsAndroid);
 
       await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+      // 起動時に古い通知キャッシュを安全にクリア（フォーマット不一致による破損対策）
+      try {
+        await flutterLocalNotificationsPlugin.cancelAll();
+      } catch (e) {
+        print('NotificationService: キャッシュ破損検出、クリアします: $e');
+        await _clearNotificationCache();
+      }
     } catch (e) {
       print('NotificationService init error: $e');
-      // Non-blocking error
     }
   }
 
@@ -68,41 +83,40 @@ class NotificationService {
     }
   }
 
-  // Cancel specifically for today (actually just cancels the daily recurring ID, then reschedules for tomorrow)
-  // But since we use matchDateTimeComponents.time, it repeats daily.
-  // To "skip" today, we can just cancel it. 
-  // However, cancelling execution 0 means it won't ring tomorrow either unless we reschedule.
-  // So the logic should be: call this when quota is reached.
-  // It cancels ID 0. Then schedules a ONE-OFF for tomorrow 21:00? 
-  // OR: We just let it ring. The user said "if quota is not met". 
-  // So checking quota *at the time of notification* is hard with local notifications (needs background execution).
-  // Strategy:
-  // 1. Always schedule daily at 21:00.
-  // 2. When user finishes quota in app -> Cancel ID 0.
-  // 3. Then Schedule ID 0 starting from *Tomorrow* 21:00 (Daily).
+  /// 今日のノルマ達成時に呼び出す。通知を明日以降にリスケジュール。
   Future<void> completeForToday() async {
-    await flutterLocalNotificationsPlugin.cancel(0);
-    
-    // Reschedule for tomorrow
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      0,
-      '学習の時間です',
-      '本日のノルマはまだ達成されていません。少しだけ頑張りましょう！',
-      _nextInstance(21, 0, forceTomorrow: true),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_reminder',
-          'Daily Reminder',
-          channelDescription: 'Reminds you to study if you haven\'t finished your quota',
-          importance: Importance.max,
-          priority: Priority.high,
+    try {
+      await flutterLocalNotificationsPlugin.cancel(0);
+    } catch (e) {
+      print('Notification cancel error (non-critical): $e');
+      // キャッシュが破損している場合は削除してリセット
+      await _clearNotificationCache();
+    }
+
+    // 明日以降にリスケジュール
+    try {
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        0,
+        '学習の時間です',
+        '本日のノルマはまだ達成されていません。少しだけ頑張りましょう！',
+        _nextInstance(21, 0, forceTomorrow: true),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_reminder',
+            'Daily Reminder',
+            channelDescription: 'Reminds you to study if you haven\'t finished your quota',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } catch (e) {
+      print('Notification reschedule error (non-critical): $e');
+    }
   }
 
   tz.TZDateTime _nextInstance(int hour, int minute, {bool forceTomorrow = false}) {
