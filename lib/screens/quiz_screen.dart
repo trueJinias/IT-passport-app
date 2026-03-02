@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../providers/quiz_provider.dart';
 import '../widgets/ad_banner.dart';
 import 'result_screen.dart';
@@ -62,12 +63,23 @@ class QuizScreen extends ConsumerWidget {
     final question = quizState.currentQuestion;
 
     return Scaffold(
-        appBar: AppBar(
-          title: Text('問題 ${quizState.currentIndex + 1} / ${quizState.questions.length}'),
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight + 50.0),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AdBanner(),
+                AppBar(
+                  title: Text('問題 ${quizState.currentIndex + 1} / ${quizState.questions.length}'),
+                  primary: false,
+                ),
+              ],
+            ),
+          ),
         ),
         body: Column(
           children: [
-            const AdBanner(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
@@ -161,7 +173,9 @@ class QuizScreen extends ConsumerWidget {
                       else 
                          const Center(child: CircularProgressIndicator()),
                       
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
+                      AdBanner(size: AdSize.mediumRectangle),
+                      const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(

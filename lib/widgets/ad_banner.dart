@@ -3,7 +3,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../services/ad_helper.dart';
 
 class AdBanner extends StatefulWidget {
-  const AdBanner({super.key});
+  final AdSize size;
+  const AdBanner({super.key, this.size = AdSize.banner});
 
   @override
   State<AdBanner> createState() => _AdBannerState();
@@ -28,7 +29,7 @@ class _AdBannerState extends State<AdBanner> {
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
       request: const AdRequest(),
-      size: AdSize.banner,
+      size: widget.size,
       listener: BannerAdListener(
         onAdLoaded: (ad) {
           if (mounted) {
@@ -64,7 +65,7 @@ class _AdBannerState extends State<AdBanner> {
     // Fallback or empty when loading/failed
     // Showing placeholder for dev purposes so we know space is taken
     return Container(
-       height: 50,
+       height: widget.size.height.toDouble(),
        width: double.infinity,
        color: Colors.grey[200],
        alignment: Alignment.center,
