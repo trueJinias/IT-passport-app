@@ -134,6 +134,7 @@ class QuizScreen extends ConsumerWidget {
                           ),
                           child: Text(
                             '${['ア', 'イ', 'ウ', 'エ'][index < 4 ? index : index % 4]}. ${question.options[index]}',
+                            softWrap: true,
                             style: TextStyle(
                               color: isAnswered
                                   ? (isCorrect ? Colors.green : (isSelected ? Colors.red : Theme.of(context).colorScheme.onSurface))
@@ -147,7 +148,7 @@ class QuizScreen extends ConsumerWidget {
                     if (quizState.isAnswered) ...[
                       const SizedBox(height: 24),
                       Text(
-                        '学習スケジュール評価',
+                        'この問題、次いつ復習する？',
                         style: TextStyle(color: Colors.grey[600], fontSize: 12),
                       ),
                       const SizedBox(height: 8),
@@ -234,12 +235,30 @@ class QuizScreen extends ConsumerWidget {
     );
   }
 
-  /// 中黒「・」が箇条書き区切りとして使われている場合に改行を挿入する
+  /// 中黒「・」や選択肢記号（a. b. c. d. 等）の前に改行を挿入して読みやすくする
   String _preprocessText(String text) {
-    return text.replaceAllMapped(
+    var result = text;
+    
+    // 中黒「・」の前に改行を挿入
+    result = result.replaceAllMapped(
       RegExp(r'([^\n])・'),
       (match) => '${match.group(1)}\n\n・',
     );
+    
+    // 選択肢記号 a. b. c. d. （半角/全角スペース付き）の前に改行を挿入
+    // 問題文の中に含まれる a. b. c. d. などを検出
+    result = result.replaceAllMapped(
+      RegExp(r'([^\n])\s*([a-d]\.)'),
+      (match) => '${match.group(1)}\n\n${match.group(2)}',
+    );
+    
+    // 全角 a. b. c. d. や ア. イ. ウ. エ. などカナ記号の前にも改行を挿入
+    result = result.replaceAllMapped(
+      RegExp(r'([^\n])\s*([ア-ン]\.)'),
+      (match) => '${match.group(1)}\n\n${match.group(2)}',
+    );
+    
+    return result;
   }
 
   Widget _buildRateButton(BuildContext context, QuizNotifier notifier, int rating, String label, Color color, String timeLabel) {
