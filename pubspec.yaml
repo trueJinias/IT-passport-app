@@ -1,7 +1,7 @@
 name: it_passport_app
 description: A new Flutter project for IT Passport Exam.
 publish_to: 'none'
-version: 1.0.5+60
+version: 1.0.6+66
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -13,8 +13,14 @@ dependencies:
   json_annotation: ^4.8.1
   shared_preferences: ^2.2.2
   google_mobile_ads: ^5.0.0
+  firebase_core: ^3.1.0
+  firebase_analytics: ^11.0.1
+  firebase_crashlytics: ^4.0.1
+  firebase_performance: ^0.10.0
+  firebase_remote_config: ^5.0.1
   flutter_local_notifications: ^18.0.1
   timezone: ^0.10.0
+  flutter_timezone: ^5.0.1
   introduction_screen: ^3.1.14
   in_app_purchase: ^3.1.13
   flutter_markdown: ^0.7.3
@@ -49,3 +55,4 @@ flutter:
   assets:
     - assets/questions.json
     - assets/icon/icon_main.png
+    - assets/images/itpass/

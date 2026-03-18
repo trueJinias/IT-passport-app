@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:io';
 import 'providers/theme_provider.dart';
 import 'services/notification_service.dart';
 import 'screens/main_screen.dart';
@@ -12,6 +16,11 @@ import 'screens/tutorial_screen.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
 
   bool isFirstLaunch = true;
@@ -46,19 +55,57 @@ void main() async {
   );
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends ConsumerStatefulWidget {
   final bool isFirstLaunch;
   const MyApp({super.key, required this.isFirstLaunch});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(themeProvider);
-    
+  ConsumerState<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Remove splash after the first frame is rendered
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FlutterNativeSplash.remove();
     });
+    _rescheduleNotifications();
+  }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // アプリがフォアグラウンドに戻った時に通知を再スケジュール
+    // これにより端末再起動後などでも通知が復元される
+    if (state == AppLifecycleState.resumed) {
+      _rescheduleNotifications();
+    }
+  }
+
+  /// 通知を再スケジュール（端末再起動後の復元など）
+  Future<void> _rescheduleNotifications() async {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      try {
+        final notificationService = NotificationService();
+        await notificationService.scheduleDailyReminder();
+      } catch (e) {
+        debugPrint('Failed to reschedule notifications: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeProvider);
+    
     return MaterialApp(
       title: 'ITパスポート 一問一答',
       theme: ThemeData(
@@ -97,7 +144,7 @@ class MyApp extends ConsumerWidget {
           child: child!,
         );
       },
-      home: isFirstLaunch ? const TutorialScreen() : const MainScreen(),
+      home: widget.isFirstLaunch ? const TutorialScreen() : const MainScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

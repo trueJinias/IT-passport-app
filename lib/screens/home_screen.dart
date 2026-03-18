@@ -79,6 +79,14 @@ class HomeScreen extends ConsumerWidget {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            child: Text(
+              '本アプリの問題は、独立行政法人情報処理推進機構（IPA）が公開している過去問題を使用しています。',
+              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+          ),
           const AdBanner(),
         ],
       ),

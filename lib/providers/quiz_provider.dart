@@ -69,6 +69,7 @@ List<Question> _parseJson(String jsonString) {
 class QuizNotifier extends StateNotifier<QuizState> {
   final ReviewService _reviewService = ReviewService();
   List<Question> _allQuestions = [];
+  final Set<int> _againRatedIds = {};
 
   QuizNotifier() : super(QuizState()); 
 
@@ -246,12 +247,31 @@ class QuizNotifier extends StateNotifier<QuizState> {
     }
   }
 
+  Future<void> handleBackPress() async {
+    if (state.isAnswered && state.questions.isNotEmpty &&
+        state.currentIndex < state.questions.length) {
+      final question = state.currentQuestion;
+      await _reviewService.saveReview(question.id, 2);
+      _againRatedIds.remove(question.id);
+    }
+    for (final id in _againRatedIds) {
+      await _reviewService.saveReview(id, 2);
+    }
+    _againRatedIds.clear();
+  }
+
   Future<void> rateQuestion(int rating) async {
     final question = state.currentQuestion;
     await _reviewService.saveReview(question.id, rating);
-    
+
+    if (rating == 1) {
+      _againRatedIds.add(question.id);
+    } else {
+      _againRatedIds.remove(question.id);
+    }
+
     var currentQuestions = List<Question>.from(state.questions);
-    
+
     // If "Again" (1), re-queue the question +10 spots later (or at end)
     if (rating == 1) {
       final insertIndex = (state.currentIndex + 1 + 10).clamp(0, currentQuestions.length);
