@@ -71,7 +71,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // Remove splash after the first frame is rendered
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       FlutterNativeSplash.remove();
-      if (!kIsWeb && Platform.isAndroid) {
+      // 既存ユーザー（チュートリアル完了済み）のみ許可ダイアログを表示
+      // 新規ユーザーはチュートリアル終了時に tutorial_screen.dart 内で要求する
+      if (!kIsWeb && Platform.isAndroid && !widget.isFirstLaunch) {
         await NotificationService().requestPermission();
       }
     });
