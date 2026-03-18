@@ -69,8 +69,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // Remove splash after the first frame is rendered
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       FlutterNativeSplash.remove();
+      if (!kIsWeb && Platform.isAndroid) {
+        await NotificationService().requestPermission();
+      }
     });
     _rescheduleNotifications();
   }
