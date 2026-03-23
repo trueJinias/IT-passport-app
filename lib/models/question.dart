@@ -4,6 +4,7 @@ class Question {
   final List<String> options;
   final int correctIndex;
   final String explanation;
+  final String? category;
 
   Question({
     required this.id,
@@ -11,6 +12,7 @@ class Question {
     required this.options,
     required this.correctIndex,
     required this.explanation,
+    this.category,
   });
 
   factory Question.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class Question {
       options: (json['options'] as List<dynamic>).map((e) => e as String).toList(),
       correctIndex: json['correctIndex'] as int,
       explanation: json['explanation'] as String,
+      category: json['category'] as String?,
     );
   }
 }

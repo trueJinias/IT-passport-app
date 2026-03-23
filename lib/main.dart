@@ -16,8 +16,7 @@ import 'screens/tutorial_screen.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize Firebase
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -35,7 +34,7 @@ void main() async {
           final notificationService = NotificationService();
           await notificationService.init();
           await notificationService.scheduleDailyReminder();
-          
+
           final prefs = await SharedPreferences.getInstance();
           isFirstLaunch = prefs.getBool('isFirstLaunch') ?? true;
         } catch (e) {
@@ -71,10 +70,11 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     // Remove splash after the first frame is rendered
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       FlutterNativeSplash.remove();
-      // 既存ユーザー（チュートリアル完了済み）のみ許可ダイアログを表示
-      // 新規ユーザーはチュートリアル終了時に tutorial_screen.dart 内で要求する
       if (!kIsWeb && Platform.isAndroid && !widget.isFirstLaunch) {
-        await NotificationService().requestPermission();
+        final granted = await NotificationService().requestPermission();
+        if (!granted && mounted) {
+          _showNotificationDisabledDialog(context);
+        }
       }
     });
     _rescheduleNotifications();
@@ -88,11 +88,28 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // アプリがフォアグラウンドに戻った時に通知を再スケジュール
-    // これにより端末再起動後などでも通知が復元される
     if (state == AppLifecycleState.resumed) {
       _rescheduleNotifications();
     }
+  }
+
+  void _showNotificationDisabledDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('通知が無効です'),
+        content: const Text(
+          '学習リマインダーを受け取るには、通知を許可してください。\n\n'
+          '設定 → アプリ → ITパスポート 過去問精釈 → 通知 → 許可',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 通知を再スケジュール（端末再起動後の復元など）
@@ -112,7 +129,7 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
     final themeMode = ref.watch(themeProvider);
     
     return MaterialApp(
-      title: 'ITパスポート 一問一答',
+      title: 'ITパスポート 過去問精釈',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, brightness: Brightness.light),
         useMaterial3: true,

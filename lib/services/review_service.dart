@@ -168,12 +168,13 @@ class ReviewService {
 
   Future<List<int>> getDueQuestionIds() async {
     final data = await _loadData();
-    final now = DateTime.now().millisecondsSinceEpoch;
+    final now = DateTime.now();
+    final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59).millisecondsSinceEpoch;
     final List<int> dueIds = [];
 
     data.forEach((key, value) {
       final nextReview = value['nextReview'] as int;
-      if (nextReview <= now) {
+      if (nextReview <= endOfToday) {
         dueIds.add(int.parse(key));
       }
     });
@@ -194,10 +195,11 @@ class ReviewService {
       int due = 0;
       int correct = 0; // interval > 0 = 正解して卒業済み
       const int totalQuestions = 1000;
-      final now = DateTime.now().millisecondsSinceEpoch;
+      final now = DateTime.now();
+      final endOfToday = DateTime(now.year, now.month, now.day, 23, 59, 59).millisecondsSinceEpoch;
 
       data.forEach((k, v) {
-          if ((v['nextReview'] as int) <= now) due++;
+          if ((v['nextReview'] as int) <= endOfToday) due++;
           if ((v['interval'] as int? ?? 0) > 0) correct++;
       });
 
@@ -224,12 +226,11 @@ class ReviewService {
     
     data.forEach((k, v) {
       final nextReview = v['nextReview'] as int;
-      if (nextReview >= todayStart) {
-        final diff = nextReview - todayStart;
-        final dayIndex = (diff / msPerDay).floor();
-        if (dayIndex >= 0 && dayIndex < days) {
-          counts[dayIndex]++;
-        }
+      final diff = nextReview - todayStart;
+      int dayIndex = (diff / msPerDay).floor();
+      if (dayIndex < 0) dayIndex = 0; // 期限切れ → 今日のバケットへ
+      if (dayIndex < days) {
+        counts[dayIndex]++;
       }
     });
     

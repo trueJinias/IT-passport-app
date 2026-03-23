@@ -7,7 +7,7 @@ import '../services/review_service.dart';
 import '../services/settings_service.dart';
 import '../services/notification_service.dart';
 
-enum QuizMode { normal, review }
+enum QuizMode { normal, review, category }
 
 class QuizState {
   final List<Question> questions;
@@ -159,6 +159,47 @@ class QuizNotifier extends StateNotifier<QuizState> {
     }
   }
 
+  Future<void> startCategoryQuiz(String category) async {
+    try {
+      state = state.copyWith(isLoading: true, errorMessage: null);
+      await _ensureLoaded();
+      if (!mounted) return;
+
+      if (_allQuestions.isEmpty) {
+        if (mounted) state = state.copyWith(isLoading: false, errorMessage: '問題データが空です。');
+        return;
+      }
+
+      final categoryQuestions = _allQuestions.where((q) => q.category == category).toList();
+
+      if (categoryQuestions.isEmpty) {
+        if (mounted) {
+          state = QuizState(
+            questions: [],
+            isLoading: false,
+            mode: QuizMode.category,
+            errorMessage: '$category の問題が見つかりません。',
+          );
+        }
+        return;
+      }
+
+      final shuffled = listShim(categoryQuestions)..shuffle();
+      final quizQuestions = shuffled.take(10).toList();
+
+      if (mounted) {
+        state = QuizState(
+          questions: quizQuestions,
+          isLoading: false,
+          mode: QuizMode.category,
+          errorMessage: null,
+        );
+      }
+    } catch (e) {
+      if (mounted) state = state.copyWith(isLoading: false, errorMessage: 'エラーが発生しました: $e');
+    }
+  }
+
   Future<void> startReviewQuiz() async {
     try {
       state = state.copyWith(isLoading: true, errorMessage: null);
@@ -205,36 +246,23 @@ class QuizNotifier extends StateNotifier<QuizState> {
     final question = state.currentQuestion;
     final isCorrect = index == question.correctIndex;
 
-    // Use actual calculations to show real intervals on buttons
-    final calcGood = await _reviewService.calculateNextReview(question.id, 3);
-    final calcEasy = await _reviewService.calculateNextReview(question.id, 4);
-    int intervalGood = calcGood['interval'] as int;
-    int intervalEasy = calcEasy['interval'] as int;
-    int delayGood = calcGood['delayMinutes'] as int;
-    int delayEasy = calcEasy['delayMinutes'] as int;
+    final calc1 = await _reviewService.calculateNextReview(question.id, 1);
+    final calc2 = await _reviewService.calculateNextReview(question.id, 2);
+    final calc3 = await _reviewService.calculateNextReview(question.id, 3);
+    final calc4 = await _reviewService.calculateNextReview(question.id, 4);
 
-    // If card is in learning/relearning phase (graduation):
-    // Show the BASE graduation interval: Good="明日"(1日), Easy="3日後"(3日)
-    // After "Again" resets step to 0, this ensures correct graduation intervals.
-    if (delayGood <= 1440) {
-      intervalGood = 1;  // base interval for Good
-      delayGood = 1 * 1440;
-      intervalEasy = 3;  // base interval for Easy
-      delayEasy = 3 * 1440;
-    }
-
-    String formatInterval(int days, int minutes) {
-      if (minutes < 1440) return '今日';
-      if (days == 1) return '明日';
-      if (days > 30) return '${(days/30).floor()}ヶ月後';
-      return '$days日後';
+    String labelForCalc(Map<String, dynamic> calc) {
+      int interval = calc['interval'] as int;
+      if (interval == 0) return '今日';
+      if (interval == 1) return '明日';
+      return '$interval日後';
     }
 
     final labels = <int, String>{
-      1: '今回',   // Again
-      2: '今日',   // Hard
-      3: formatInterval(intervalGood, delayGood),   // Good
-      4: formatInterval(intervalEasy, delayEasy),   // Easy
+      1: '今回',
+      2: '今日',
+      3: labelForCalc(calc3),
+      4: labelForCalc(calc4),
     };
 
     if (mounted) {

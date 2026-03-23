@@ -3,7 +3,7 @@ import 'dart:io';
 class AdHelper {
   // Official AdMob Test ID for Android Banner
   static String get androidBannerAdUnitId {
-    return 'ca-app-pub-3940256099942544/6300978111';
+    return 'ca-app-pub-9528984947357055/3010772023';
   }
 
   // Official AdMob Test ID for iOS Banner
