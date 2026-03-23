@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class PrivacyPolicyScreen extends StatefulWidget {
@@ -24,14 +25,14 @@ class _PrivacyPolicyScreenState extends State<PrivacyPolicyScreen> {
               _isLoading = false;
             });
           },
-          onWebResourceError: (_) {
-            setState(() {
-              _isLoading = false;
-            });
-          },
         ),
-      )
-      ..loadRequest(Uri.parse('https://it-passport-app.vercel.app/'));
+      );
+    _loadLocalHtml();
+  }
+
+  Future<void> _loadLocalHtml() async {
+    final html = await rootBundle.loadString('assets/privacy_policy.html');
+    await _controller.loadHtmlString(html);
   }
 
   @override

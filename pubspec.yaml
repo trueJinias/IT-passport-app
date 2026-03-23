@@ -1,7 +1,7 @@
 name: it_passport_app
 description: A new Flutter project for IT Passport Exam.
 publish_to: 'none'
-version: 1.0.6+73
+version: 1.0.6+74
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -56,3 +56,4 @@ flutter:
     - assets/questions.json
     - assets/icon/icon_main.png
     - assets/images/itpass/
+    - assets/privacy_policy.html
